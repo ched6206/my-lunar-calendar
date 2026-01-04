@@ -5,19 +5,28 @@ from datetime import datetime
 # --- 網頁設定 ---
 st.set_page_config(page_title="素雅萬年曆", page_icon="📅")
 
-# --- CSS 樣式 (維持素雅中國風) ---
+# --- CSS 樣式 (宋體版) ---
 st.markdown("""
     <style>
     /* 全域背景 */
     .stApp { background-color: #F7F7F2; }
     
-    /* 字體設定 */
-    h1, h2, h3, p, div, label, input, .stMarkdown, span {
-        font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif !important;
+    /* 【字體設定關鍵修改】 
+       優先順序：Mac宋體 -> Windows中易宋體 -> Windows新細明體 -> 系統預設襯線體
+    */
+    h1, h2, h3, p, div, label, input, .stMarkdown, span, button {
+        font-family: "Songti SC", "SimSun", "PMingLiU", "MingLiU", "Microsoft JhengHei", serif !important;
         color: #333333;
     }
 
-    h1 { color: #8C5042 !important; text-align: center; margin-bottom: 25px; }
+    /* 標題加強一點粗體，宋體如果太細標題會沒氣勢 */
+    h1 { 
+        color: #8C5042 !important; 
+        text-align: center; 
+        margin-bottom: 25px; 
+        font-weight: bold; 
+        letter-spacing: 2px; /* 增加字距，更有古風 */
+    }
     
     /* 輸入框樣式 */
     div[data-baseweb="input"] > div {
@@ -35,14 +44,15 @@ st.markdown("""
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
         padding: 30px;
-        border-radius: 8px;
+        border-radius: 4px; /* 宋體適合方一點的角 */
         text-align: center;
         margin-top: 20px;
-        font-size: 1.5rem;
-        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        font-size: 1.6rem;
+        box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
         max-width: 600px;
         margin-left: auto;
         margin-right: auto;
+        line-height: 1.8; /* 增加行高，像古書排版 */
     }
     
     /* 提示文字 */
@@ -52,6 +62,7 @@ st.markdown("""
         margin-top: -10px;
         margin-bottom: 10px;
         margin-left: 5px;
+        font-style: italic; /* 宋體斜體很有味道 */
     }
     
     /* 等待輸入的提示區塊 */
@@ -60,8 +71,9 @@ st.markdown("""
         color: #aaa;
         padding: 40px;
         border: 1px dashed #ccc;
-        border-radius: 8px;
+        border-radius: 4px;
         margin-top: 20px;
+        letter-spacing: 1px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -89,17 +101,16 @@ with col_content:
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        # 【關鍵修改】 value=None (預設空白), placeholder="提示文字"
+        # 預設空白 (value=None)
         y = st.number_input("年", min_value=1, max_value=2100, value=None, step=1, format="%d", placeholder="如 114")
         
-        # 只有當使用者輸入數字後，才顯示判讀提示
         if y is not None:
             if y < 1900:
                 st.markdown(f"<div class='hint-text'>民國 {y} 年</div>", unsafe_allow_html=True)
             else:
                 st.markdown(f"<div class='hint-text'>西元 {y} 年</div>", unsafe_allow_html=True)
         else:
-             st.markdown(f"<div class='hint-text'>&nbsp;</div>", unsafe_allow_html=True) # 佔位符保持版面高度
+             st.markdown(f"<div class='hint-text'>&nbsp;</div>", unsafe_allow_html=True)
             
     with c2:
         m = st.number_input("月", min_value=1, max_value=12, value=None, step=1, format="%d", placeholder="1~12")
@@ -112,7 +123,6 @@ with col_content:
         is_leap = st.checkbox("輸入的是閏月")
 
     # --- 轉換邏輯 ---
-    # 只有當三個格子「都不是 None」(都有輸入數字) 時，才開始計算
     if y is not None and m is not None and d is not None:
         try:
             # 自動判斷西元/民國
@@ -133,7 +143,7 @@ with col_content:
                     <span style="font-size: 0.8em; color: #666;">【輸入國曆】</span><br>
                     <b>{display_year_str} 年 {m} 月 {d} 日</b><br><br>
                     <span style="font-size: 0.8em; color: #666;">【轉換農曆】</span><br>
-                    <b style="color: #8C5042; font-size: 2rem;">{trad_lunar}</b>
+                    <b style="color: #8C5042; font-size: 2.2rem; font-weight: bold;">{trad_lunar}</b>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -150,7 +160,7 @@ with col_content:
                     <span style="font-size: 0.8em; color: #666;">【輸入農曆】</span><br>
                     <b>{display_year_str} 年 {m} 月 {d} 日 {leap_txt}</b><br><br>
                     <span style="font-size: 0.8em; color: #666;">【轉換國曆】</span><br>
-                    <b style="color: #8C5042; font-size: 2rem;">西元 {solar_dt.year} 年 {solar_dt.month} 月 {solar_dt.day} 日</b><br>
+                    <b style="color: #8C5042; font-size: 2.2rem; font-weight: bold;">西元 {solar_dt.year} 年 {solar_dt.month} 月 {solar_dt.day} 日</b><br>
                     (民國 {minguo_y} 年) {w_day}
                 </div>
                 """, unsafe_allow_html=True)
@@ -158,7 +168,6 @@ with col_content:
         except Exception:
             st.warning("⚠️ 日期無效，請檢查輸入")
     else:
-        # 如果還沒輸入完，顯示一個淡淡的提示框
         st.markdown("""
         <div class="waiting-box">
             請輸入完整 年、月、日 以進行轉換
