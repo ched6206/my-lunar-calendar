@@ -6,34 +6,29 @@ import calendar
 # --- 網頁設定 ---
 st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="wide")
 
-# --- CSS 樣式 (素雅中國風) ---
+# --- CSS 樣式 ---
 st.markdown("""
     <style>
     /* 全域設定 */
     .stApp { background-color: #F7F7F2; }
     
-    h1, h2, h3, p, div, label, .stNumberInput input, .stMarkdown, span {
+    h1, h2, h3, p, div, label, .stNumberInput input, .stMarkdown, span, th, td {
         font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif !important;
         color: #333333;
     }
 
     h1 { color: #8C5042 !important; text-align: center; margin-bottom: 20px; }
     
-    /* 調整 NumberInput (輸入框) 樣式 */
+    /* 輸入框樣式 */
     div[data-baseweb="input"] > div {
         background-color: white; 
         border: 1px solid #ccc;
         color: #333333;
         border-radius: 4px;
     }
-    
-    /* 隱藏 NumberInput 旁邊那個醜醜的加減按鈕 (滑鼠移上去才顯示) */
-    button[kind="secondary"] {
-        border: none;
-        background: transparent;
-    }
+    button[kind="secondary"] { border: none; background: transparent; }
 
-    /* 左側結果區 */
+    /* 結果區 */
     .result-box {
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
@@ -45,7 +40,7 @@ st.markdown("""
         box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
     
-    /* 右側日曆容器 */
+    /* 日曆容器 */
     .calendar-container {
         background-color: white;
         border: 2px solid #8C5042;
@@ -69,13 +64,14 @@ st.markdown("""
         text-align: center;
         border-collapse: collapse;
     }
-    th { color: #888; font-weight: normal; padding: 5px; font-size: 1rem; }
+    th { color: #888; font-weight: normal; padding: 5px; font-size: 1rem; border-bottom: 1px solid #eee;}
     
     td { 
-        padding: 4px; 
+        padding: 2px; 
         vertical-align: top; 
-        height: 55px; 
-        width: 14%;
+        height: 60px; /* 固定高度 */
+        width: 14.28%; /* 七等分 */
+        border: 1px solid #f0f0f0; /* 淡淡的格線 */
     }
     
     .day-cell {
@@ -84,21 +80,22 @@ st.markdown("""
         align-items: center;
         justify-content: center;
         height: 100%;
+        width: 100%;
         border-radius: 5px;
         cursor: default;
     }
     
-    .solar-num { font-size: 1.2rem; font-weight: bold; line-height: 1.2; }
-    .lunar-num { font-size: 0.75rem; color: #999; line-height: 1; margin-top: 2px; }
+    .solar-num { font-size: 1.1rem; font-weight: bold; line-height: 1.2; }
+    .lunar-num { font-size: 0.7rem; color: #999; line-height: 1; margin-top: 2px; }
 
+    /* 選中日期樣式 */
     .selected-day-bg {
         background-color: #8C5042;
-        border-radius: 8px;
+        border-radius: 4px;
     }
     .selected-day-bg .solar-num { color: white !important; }
     .selected-day-bg .lunar-num { color: #FFD700 !important; }
     
-    /* 提示文字 */
     .hint-text {
         font-size: 0.9rem;
         color: #888;
@@ -179,7 +176,7 @@ st.title("萬年曆轉換系統")
 
 col_main, col_side = st.columns([1.8, 1.2])
 
-# ================= 左側：輸入與結果 =================
+# 左側：輸入與結果
 with col_main:
     mode = st.radio("轉換模式：", ["國曆 轉 農曆", "農曆 轉 國曆"], horizontal=True)
     st.write("") 
@@ -187,11 +184,7 @@ with col_main:
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        # 改回 Number Input：打字 -> Enter -> 直接生效
-        # format="%d" 避免出現逗號 (2,024)
         y = st.number_input("年", min_value=1, max_value=2100, value=2024, step=1, format="%d")
-        
-        # 【智慧提示】在下方顯示年份判讀結果
         if y < 1900:
             st.markdown(f"<div class='hint-text'>民國 {y} 年</div>", unsafe_allow_html=True)
         else:
@@ -206,9 +199,8 @@ with col_main:
     if mode == "農曆 轉 國曆":
         is_leap = st.checkbox("輸入的是閏月")
 
-    # --- 邏輯運算 ---
     try:
-        # 自動判斷民國/西元
+        # 自動判斷
         if y < 1900:
             calc_year = y + 1911
             display_year_str = f"西元 {calc_year} (民國 {y})"
@@ -252,20 +244,18 @@ with col_main:
             
             cal_year, cal_month, cal_day = solar_dt.year, solar_dt.month, solar_dt.day
 
-    except ValueError:
-        st.error(f"❌ 無效日期！")
-        cal_year, cal_month, cal_day = calc_year, m, 0
-    except Exception as e:
-        # 通常是輸入到一半日期還不存在時會報錯，這裡靜默處理即可
-        st.error(f"日期計算錯誤")
+    except Exception:
+        # 日期出錯時，不顯示錯誤訊息以免嚇到使用者，顯示當月空白日曆即可
         cal_year, cal_month, cal_day = calc_year, m, 0
 
-# ================= 右側：日曆顯示區 =================
+# 右側：日曆顯示區
 with col_side:
-    # 這裡的高度修正要根據 NumberInput 的高度調整
-    # 大約 60px 可以對齊 (因為 NumberInput 比較高一點)
     st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)
     
     if 'cal_year' in locals():
+        # 產生 HTML 原始碼
         cal_html = generate_calendar_html(cal_year, cal_month, cal_day)
+        
+        # 【關鍵修復】
+        # 這裡必須加上 unsafe_allow_html=True，否則 Streamlit 會把 HTML 當作純文字印出來！
         st.markdown(cal_html, unsafe_allow_html=True)
