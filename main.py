@@ -6,13 +6,14 @@ import calendar
 # --- 網頁設定 ---
 st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="wide")
 
-# --- CSS 樣式 ---
+# --- CSS 樣式 (素雅中國風) ---
 st.markdown("""
     <style>
     /* 全域設定 */
     .stApp { background-color: #F7F7F2; }
     
-    h1, h2, h3, p, div, label, .stNumberInput input, .stMarkdown, span, th, td {
+    /* 強制設定所有字體 */
+    h1, h2, h3, p, div, label, input, .stMarkdown, span, th, td {
         font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif !important;
         color: #333333;
     }
@@ -26,9 +27,10 @@ st.markdown("""
         color: #333333;
         border-radius: 4px;
     }
+    /* 隱藏輸入框的加減按鈕 */
     button[kind="secondary"] { border: none; background: transparent; }
 
-    /* 結果區 */
+    /* 左側結果區 */
     .result-box {
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
@@ -40,7 +42,7 @@ st.markdown("""
         box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
     
-    /* 日曆容器 */
+    /* --- 右側日曆容器樣式 --- */
     .calendar-container {
         background-color: white;
         border: 2px solid #8C5042;
@@ -69,11 +71,12 @@ st.markdown("""
     td { 
         padding: 2px; 
         vertical-align: top; 
-        height: 60px; /* 固定高度 */
-        width: 14.28%; /* 七等分 */
-        border: 1px solid #f0f0f0; /* 淡淡的格線 */
+        height: 60px; 
+        width: 14.28%; 
+        border: 1px solid #f9f9f9;
     }
     
+    /* 日期格子內容 */
     .day-cell {
         display: flex;
         flex-direction: column;
@@ -88,7 +91,7 @@ st.markdown("""
     .solar-num { font-size: 1.1rem; font-weight: bold; line-height: 1.2; }
     .lunar-num { font-size: 0.7rem; color: #999; line-height: 1; margin-top: 2px; }
 
-    /* 選中日期樣式 */
+    /* 選中日期樣式 (紅底金字) */
     .selected-day-bg {
         background-color: #8C5042;
         border-radius: 4px;
@@ -184,6 +187,7 @@ with col_main:
     c1, c2, c3 = st.columns(3)
     
     with c1:
+        # 輸入框：輸入完按 Enter 即可
         y = st.number_input("年", min_value=1, max_value=2100, value=2024, step=1, format="%d")
         if y < 1900:
             st.markdown(f"<div class='hint-text'>民國 {y} 年</div>", unsafe_allow_html=True)
@@ -245,7 +249,6 @@ with col_main:
             cal_year, cal_month, cal_day = solar_dt.year, solar_dt.month, solar_dt.day
 
     except Exception:
-        # 日期出錯時，不顯示錯誤訊息以免嚇到使用者，顯示當月空白日曆即可
         cal_year, cal_month, cal_day = calc_year, m, 0
 
 # 右側：日曆顯示區
@@ -253,9 +256,8 @@ with col_side:
     st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)
     
     if 'cal_year' in locals():
-        # 產生 HTML 原始碼
         cal_html = generate_calendar_html(cal_year, cal_month, cal_day)
         
         # 【關鍵修復】
-        # 這裡必須加上 unsafe_allow_html=True，否則 Streamlit 會把 HTML 當作純文字印出來！
+        # 這裡的 unsafe_allow_html=True 絕對不能少！
         st.markdown(cal_html, unsafe_allow_html=True)
