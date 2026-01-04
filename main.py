@@ -1,61 +1,66 @@
 import streamlit as st
 from zhdate import ZhDate
 from datetime import datetime
-import calendar # 新增日曆模組
+import calendar
 
 # --- 網頁設定 ---
-st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="wide") # layout="wide" 讓畫面寬一點，才放得下並排
+st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="wide")
 
-# --- CSS 樣式 (素雅中國風 + 日曆樣式) ---
+# --- CSS 樣式 (素雅中國風) ---
 st.markdown("""
     <style>
-    /* 全域背景 */
+    /* 全域設定 */
     .stApp { background-color: #F7F7F2; }
     
-    /* 字體設定 */
-    h1, h2, h3, p, div, label, .stSelectbox, .stMarkdown {
+    h1, h2, h3, p, div, label, .stNumberInput input, .stMarkdown, span {
         font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif !important;
-        color: #333333 !important;
-    }
-
-    h1 { color: #8C5042 !important; text-align: center; margin-bottom: 10px; }
-    
-    /* 調整選單顏色 */
-    div[data-baseweb="select"] > div {
-        background-color: white;
-        border: 1px solid #ccc;
         color: #333333;
     }
+
+    h1 { color: #8C5042 !important; text-align: center; margin-bottom: 20px; }
     
-    /* 結果顯示區 (左側) */
+    /* 調整 NumberInput (輸入框) 樣式 */
+    div[data-baseweb="input"] > div {
+        background-color: white; 
+        border: 1px solid #ccc;
+        color: #333333;
+        border-radius: 4px;
+    }
+    
+    /* 隱藏 NumberInput 旁邊那個醜醜的加減按鈕 (滑鼠移上去才顯示) */
+    button[kind="secondary"] {
+        border: none;
+        background: transparent;
+    }
+
+    /* 左側結果區 */
     .result-box {
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
         padding: 20px;
         border-radius: 5px;
         text-align: center;
-        margin-top: 20px;
+        margin-top: 15px;
         font-size: 1.3rem;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
     
-    /* --- 右側日曆專用樣式 --- */
+    /* 右側日曆容器 */
     .calendar-container {
         background-color: white;
         border: 2px solid #8C5042;
         border-radius: 8px;
-        padding: 15px;
+        padding: 10px;
         box-shadow: 3px 3px 8px rgba(0,0,0,0.1);
         width: 100%;
-        max-width: 350px; /* 限制日曆最大寬度 */
         margin: 0 auto;
     }
     .cal-header {
         text-align: center;
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         font-weight: bold;
         color: #8C5042;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         border-bottom: 1px dashed #8C5042;
         padding-bottom: 5px;
     }
@@ -63,34 +68,64 @@ st.markdown("""
         width: 100%;
         text-align: center;
         border-collapse: collapse;
-        font-size: 1.1rem;
     }
-    th { color: #666; font-weight: normal; padding: 5px; }
-    td { padding: 8px 2px; }
+    th { color: #888; font-weight: normal; padding: 5px; font-size: 1rem; }
     
-    /* 被選中的日期 (紅圈圈) */
-    .selected-day {
-        background-color: #8C5042;
-        color: white !important;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: inline-block;
-        line-height: 30px; /* 垂直置中 */
-        font-weight: bold;
+    td { 
+        padding: 4px; 
+        vertical-align: top; 
+        height: 55px; 
+        width: 14%;
     }
-    .today-marker {
-        border: 1px solid #8C5042;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: inline-block;
-        line-height: 30px;
+    
+    .day-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        border-radius: 5px;
+        cursor: default;
+    }
+    
+    .solar-num { font-size: 1.2rem; font-weight: bold; line-height: 1.2; }
+    .lunar-num { font-size: 0.75rem; color: #999; line-height: 1; margin-top: 2px; }
+
+    .selected-day-bg {
+        background-color: #8C5042;
+        border-radius: 8px;
+    }
+    .selected-day-bg .solar-num { color: white !important; }
+    .selected-day-bg .lunar-num { color: #FFD700 !important; }
+    
+    /* 提示文字 */
+    .hint-text {
+        font-size: 0.9rem;
+        color: #888;
+        margin-top: -10px;
+        margin-bottom: 10px;
+        margin-left: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 輔助函式 ---
+L_MONTHS = ["", "正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "臘月"]
+L_DAYS = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
+          "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+          "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"]
+
+def get_lunar_text(solar_date):
+    try:
+        ld = ZhDate.from_datetime(solar_date)
+        if ld.lunar_day == 1:
+            leap_str = "閏" if ld.leap_month else ""
+            return f"{leap_str}{L_MONTHS[ld.lunar_month]}"
+        else:
+            return L_DAYS[ld.lunar_day]
+    except:
+        return ""
+
 def to_traditional_chinese(simplified_str):
     mapping = {'龙': '龍', '马': '馬', '鸡': '雞', '猪': '豬', '闰': '閏', '腊': '臘', '颜': '顏'}
     result = simplified_str
@@ -98,96 +133,94 @@ def to_traditional_chinese(simplified_str):
         result = result.replace(s, t)
     return result
 
-# --- 產生 HTML 日曆的函式 ---
 def generate_calendar_html(year, month, highlight_day):
-    # 設定週日為第一天
     cal = calendar.Calendar(firstweekday=6)
     month_days = cal.monthdayscalendar(year, month)
     
-    # 標題 (例如：2024年 2月)
     html = f"""
     <div class="calendar-container">
         <div class="cal-header">{year}年 {month}月</div>
         <table class="cal-table">
             <thead>
                 <tr>
-                    <th style="color:#D2222D">日</th> <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th>
-                    <th style="color:#228B22">六</th> </tr>
+                    <th style="color:#D2222D">日</th>
+                    <th>一</th><th>二</th><th>三</th><th>四</th><th>五</th>
+                    <th style="color:#228B22">六</th>
+                </tr>
             </thead>
             <tbody>
     """
-    
     for week in month_days:
         html += "<tr>"
         for day in week:
             if day == 0:
-                html += "<td></td>" # 空白日期
+                html += "<td></td>"
             else:
-                # 判斷是否為選中的日期
+                curr_date = datetime(year, month, day)
+                lunar_txt = get_lunar_text(curr_date)
+                cell_class = "day-cell"
                 if day == highlight_day:
-                    cell_content = f'<span class="selected-day">{day}</span>'
-                else:
-                    cell_content = str(day)
-                html += f"<td>{cell_content}</td>"
+                    cell_class += " selected-day-bg"
+                
+                html += f"""
+                <td>
+                    <div class="{cell_class}">
+                        <div class="solar-num">{day}</div>
+                        <div class="lunar-num">{lunar_txt}</div>
+                    </div>
+                </td>
+                """
         html += "</tr>"
-    
-    html += """
-            </tbody>
-        </table>
-    </div>
-    """
+    html += "</tbody></table></div>"
     return html
 
-# --- 標題區 ---
+# --- 主程式 ---
 st.title("萬年曆轉換系統")
-st.markdown("<div style='text-align: center; color: #888; margin-bottom: 25px;'>⎯⎯ 素雅．查詢 ⎯⎯</div>", unsafe_allow_html=True)
 
-# --- 版面配置 (左 2 : 右 1) ---
-col_main, col_side = st.columns([1.8, 1])
+col_main, col_side = st.columns([1.8, 1.2])
 
-# ================= 左側：輸入與結果區 =================
+# ================= 左側：輸入與結果 =================
 with col_main:
     mode = st.radio("轉換模式：", ["國曆 轉 農曆", "農曆 轉 國曆"], horizontal=True)
+    st.write("") 
     
-    st.write("") # 空行微調
-    
-    # 輸入區 (使用 columns 並排)
     c1, c2, c3 = st.columns(3)
     
-    # 資料準備
-    year_list = list(range(1900, 2101))
-    default_year_idx = year_list.index(2024)
-    
-    def format_year(y):
-        if y > 1911: return f"{y} (民國{y-1911})"
-        elif y == 1911: return f"{y} (民國元年)"
-        else: return f"{y} (西元)"
-
     with c1:
-        # 使用 selectbox 即可直接打字搜尋
-        y = st.selectbox("年", options=year_list, index=default_year_idx, format_func=format_year)
+        # 改回 Number Input：打字 -> Enter -> 直接生效
+        # format="%d" 避免出現逗號 (2,024)
+        y = st.number_input("年", min_value=1, max_value=2100, value=2024, step=1, format="%d")
+        
+        # 【智慧提示】在下方顯示年份判讀結果
+        if y < 1900:
+            st.markdown(f"<div class='hint-text'>民國 {y} 年</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='hint-text'>西元 {y} 年</div>", unsafe_allow_html=True)
+            
     with c2:
-        m = st.selectbox("月", options=range(1, 13), format_func=lambda x: f"{x}月")
+        m = st.number_input("月", min_value=1, max_value=12, value=1, step=1, format="%d")
     with c3:
-        d = st.selectbox("日", options=range(1, 32), format_func=lambda x: f"{x}日")
+        d = st.number_input("日", min_value=1, max_value=31, value=1, step=1, format="%d")
 
     is_leap = False
     if mode == "農曆 轉 國曆":
         is_leap = st.checkbox("輸入的是閏月")
 
-    # --- 轉換邏輯 (即時執行) ---
+    # --- 邏輯運算 ---
     try:
-        # 顯示用的年份字串
-        if y >= 1912: display_year_str = f"西元 {y} (民國 {y-1911})"
-        else: display_year_str = f"西元 {y}"
+        # 自動判斷民國/西元
+        if y < 1900:
+            calc_year = y + 1911
+            display_year_str = f"西元 {calc_year} (民國 {y})"
+        else:
+            calc_year = y
+            display_year_str = f"西元 {y}"
 
         if mode == "國曆 轉 農曆":
-            # 嘗試建立日期 (檢查日期是否存在)
-            solar = datetime(y, m, d)
+            solar = datetime(calc_year, m, d)
             lunar = ZhDate.from_datetime(solar)
             trad_lunar = to_traditional_chinese(lunar.chinese())
             
-            # 顯示結果
             st.markdown(f"""
             <div class="result-box">
                 <span style="font-size: 0.9em; color: #666;">【輸入國曆】</span><br>
@@ -197,11 +230,10 @@ with col_main:
             </div>
             """, unsafe_allow_html=True)
             
-            # 設定日曆要顯示的日期 (就是輸入的日期)
-            cal_year, cal_month, cal_day = y, m, d
+            cal_year, cal_month, cal_day = calc_year, m, d
 
         else: # 農曆 轉 國曆
-            lunar = ZhDate(y, m, d, leap_month=is_leap)
+            lunar = ZhDate(calc_year, m, d, leap_month=is_leap)
             solar_dt = lunar.to_datetime()
             minguo_y = solar_dt.year - 1911
             week_days = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
@@ -217,22 +249,23 @@ with col_main:
                 (民國 {minguo_y} 年) {w_day}
             </div>
             """, unsafe_allow_html=True)
-
-            # 農曆轉國曆時，日曆應該顯示「轉換出來的國曆」
+            
             cal_year, cal_month, cal_day = solar_dt.year, solar_dt.month, solar_dt.day
 
     except ValueError:
-        st.error(f"❌ 無效日期！請檢查 {m}月 是否有 {d}日。")
-        cal_year, cal_month, cal_day = y, m, 0 # 出錯時日曆不圈選
+        st.error(f"❌ 無效日期！")
+        cal_year, cal_month, cal_day = calc_year, m, 0
     except Exception as e:
-        st.error(f"錯誤：{e}")
-        cal_year, cal_month, cal_day = y, m, 0
+        # 通常是輸入到一半日期還不存在時會報錯，這裡靜默處理即可
+        st.error(f"日期計算錯誤")
+        cal_year, cal_month, cal_day = calc_year, m, 0
 
 # ================= 右側：日曆顯示區 =================
 with col_side:
-    st.write("") # 排版微調，讓日曆跟輸入框對齊
-    st.write("") 
-    # 呼叫產生 HTML 的函式
+    # 這裡的高度修正要根據 NumberInput 的高度調整
+    # 大約 60px 可以對齊 (因為 NumberInput 比較高一點)
+    st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)
+    
     if 'cal_year' in locals():
         cal_html = generate_calendar_html(cal_year, cal_month, cal_day)
         st.markdown(cal_html, unsafe_allow_html=True)
