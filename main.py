@@ -5,7 +5,7 @@ from datetime import datetime
 # --- 網頁設定 ---
 st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="centered")
 
-# --- CSS 樣式 (宋體 + 自適應不換行優化) ---
+# --- CSS 樣式 ---
 st.markdown("""
     <style>
     /* 全域背景 */
@@ -34,11 +34,11 @@ st.markdown("""
     }
     button[kind="secondary"] { border: none; background: transparent; }
 
-    /* --- 結果顯示區 (外框) --- */
+    /* 結果顯示區 */
     .result-box {
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
-        padding: 30px 10px; /* 左右內距縮小，留更多空間給文字 */
+        padding: 30px 10px;
         border-radius: 4px;
         text-align: center;
         margin-top: 20px;
@@ -47,18 +47,11 @@ st.markdown("""
         width: 100%;
     }
 
-    /* --- 【關鍵修改】結果大字樣式 --- */
+    /* 結果大字樣式 */
     .result-big-text {
         color: #8C5042;
         font-weight: bold;
-        
-        /* 1. 強制不換行 */
         white-space: nowrap;
-        
-        /* 2. 智慧字體縮放 (clamp)
-           語法：clamp(最小值, 視窗寬度的比例, 最大值)
-           這樣在手機上字會自動變小，電腦上會變大，但永遠不會大到超出邊界
-        */
         font-size: clamp(1.2rem, 5vw, 2.2rem) !important;
     }
 
@@ -83,7 +76,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
     
-    /* 手機版微調 */
     @media (max-width: 768px) {
         h1 { font-size: 1.8rem !important; margin-bottom: 15px; }
         .result-box { margin-top: 10px; }
@@ -91,7 +83,63 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 輔助函式 ---
+# --- 輔助資料：天干地支與農曆對照 ---
+TIAN_GAN = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+DI_ZHI = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+L_MONTHS = ["", "正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "臘月"]
+L_DAYS = ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
+          "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+          "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十"]
+
+# --- 核心函式：自訂農曆格式 ---
+def format_custom_lunar(lunar_obj):
+    """
+    將 zhdate 物件轉換為格式：乙巳年（2025）五月初二
+    """
+    # 1. 計算天干地支
+    # 西元 4 年是甲子年，以此類推
+    year = lunar_obj.lunar_year
+    gan_index = (year - 4) % 10
+    zhi_index = (year - 4) % 12
+    gan_zhi = f"{TIAN_GAN[gan_index]}{DI_ZHI[zhi_index]}"
+    
+    # 2. 處理月份 (含閏月判斷)
+    # zhdate 的 leap_month 屬性若為非0，代表該年有閏月；
+    # 但我們要判斷「當前月份」是否為閏月，zhdate 0.4.0+ 通常會直接處理，
+    # 這裡我們用更保險的方式：直接讀取數值轉換
+    month_text = L_MONTHS[lunar_obj.lunar_month]
+    
+    # 檢查 zhdate 物件內部屬性來判斷是否顯示「閏」字
+    # 註：不同版本的 zhdate 對閏月的處理字串不同，這裡我們手動組裝最保險
+    # 如果 zhdate 內建的 chinese() 輸出包含 "闰" 或 "閏"，且月份對得上，則加上閏字
+    # 但更簡單的是直接信賴 zhdate 的計算，我們只負責組字串
+    is_leap = getattr(lunar_obj, "leap_month", 0) == lunar_obj.lunar_month
+    # 注意：zhdate 的 leap_month 屬性是指出「哪個月是閏月」，不是「現在是不是閏月」
+    # 嚴謹判斷：zhdate 物件通常是 ZhDate(year, month, day, leap_month=True/False)
+    # 不過為了簡化，我們直接看月份和日期文字
+    
+    # 這裡採用最簡單暴力的字串重組法，確保文字正確
+    leap_prefix = "閏" if (getattr(lunar_obj, "leap_month", 0) == lunar_obj.lunar_month and getattr(lunar_obj, "is_leap", False)) else ""
+    # 修正：zhdate 庫比較單純，我們直接用 chinese() 取得基本資訊會比較亂，
+    # 改用我們自己的 L_MONTHS 對照表最漂亮。
+    
+    # 關於閏月：如果使用者輸入時勾選閏月，或者從國曆轉過來剛好是閏月
+    # 從國曆轉過來的 lunar_obj，我們無法直接簡單得知「現在是不是閏月」(is_leap 屬性不一定公開)
+    # 變通：從 lunar_obj.chinese() 偷看有沒有「閏」字
+    raw_str = lunar_obj.chinese()
+    if "闰" in raw_str or "閏" in raw_str:
+        # 如果 raw_str 裡有閏，且月份跟我們算的一樣，那就加上閏
+        # 這裡做個簡單判斷，如果 chinese() 輸出的月份字串包含 "閏"，我們就加
+        if f"闰{L_MONTHS[lunar_obj.lunar_month]}" in raw_str.replace("閏", "闰") or \
+           f"閏{L_MONTHS[lunar_obj.lunar_month]}" in raw_str:
+            leap_prefix = "閏"
+    
+    # 3. 處理日期
+    day_text = L_DAYS[lunar_obj.lunar_day]
+    
+    # 4. 組裝最終字串：乙巳年（2025）五月初二
+    return f"{gan_zhi}年（{year}）{leap_prefix}{month_text}{day_text}"
+
 def to_traditional_chinese(simplified_str):
     mapping = {'龙': '龍', '马': '馬', '鸡': '雞', '猪': '豬', '闰': '閏', '腊': '臘', '颜': '顏'}
     result = simplified_str
@@ -139,7 +187,10 @@ if y is not None and m is not None and d is not None:
         if mode == "國曆 轉 農曆":
             solar = datetime(calc_year, m, d)
             lunar = ZhDate.from_datetime(solar)
-            trad_lunar = to_traditional_chinese(lunar.chinese())
+            
+            # 【關鍵修改】使用自訂格式化函式
+            formatted_lunar = format_custom_lunar(lunar)
+            trad_lunar = to_traditional_chinese(formatted_lunar)
             
             st.markdown(f"""
             <div class="result-box">
