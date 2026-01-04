@@ -8,12 +8,8 @@ st.set_page_config(page_title="素雅萬年曆", page_icon="📅")
 # --- CSS 樣式 (素雅中國風) ---
 st.markdown("""
     <style>
-    /* 背景色 */
-    .stApp {
-        background-color: #F7F7F2;
-    }
+    .stApp { background-color: #F7F7F2; }
     
-    /* 標題樣式 */
     h1 {
         color: #8C5042 !important;
         font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif;
@@ -21,21 +17,21 @@ st.markdown("""
         margin-bottom: 0px;
     }
     
-    /* 輸入框標籤顏色 */
-    .stMarkdown, .stRadio, label, .stCheckbox {
+    /* 調整所有標籤文字顏色 */
+    .stSelectbox label, .stRadio label, .stCheckbox label {
         color: #333333 !important;
         font-family: "KaiTi", "BiauKai", "Microsoft JhengHei", serif;
         font-size: 1.1rem !important;
     }
     
-    /* 調整 Number Input 輸入框本體 */
-    div[data-baseweb="input"] > div {
-        background-color: white; 
+    /* 調整選單本體顏色 (白底黑字) */
+    div[data-baseweb="select"] > div {
+        background-color: white;
         border: 1px solid #ccc;
         color: #333333;
     }
-
-    /* 按鈕樣式 (豆沙紅) */
+    
+    /* 按鈕樣式 */
     div.stButton > button {
         background-color: #8C5042;
         color: white;
@@ -49,7 +45,7 @@ st.markdown("""
         color: #FFD700;
     }
     
-    /* 結果顯示區塊 */
+    /* 結果顯示區 */
     .result-box {
         background-color: #EBEAD5;
         border: 1px solid #8C5042;
@@ -67,7 +63,7 @@ st.markdown("""
 
 # --- 標題 ---
 st.title("萬年曆轉換系統")
-st.markdown("<div style='text-align: center; color: #aaa; margin-bottom: 20px;'>⎯⎯⎯  輸入日期後按 Enter 即可  ⎯⎯⎯</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; color: #aaa; margin-bottom: 20px;'>⎯⎯  請選擇或輸入日期  ⎯⎯</div>", unsafe_allow_html=True)
 
 # --- 輔助函式 ---
 def to_traditional_chinese(simplified_str):
@@ -77,49 +73,79 @@ def to_traditional_chinese(simplified_str):
         result = result.replace(s, t)
     return result
 
+# --- 準備下拉選單的資料 ---
+
+# 1. 年份清單 (1900 ~ 2100)
+# 我們產生一個數字列表，ZhDate 支援範圍通常是 1900-2100
+year_list = list(range(1900, 2101))
+# 設定預設年份索引 (例如預設選 2024，需找出 2024 在清單中的位置)
+default_year_index = year_list.index(2024)
+
+# 2. 顯示年份的格式函式 (讓選單同時顯示西元和民國)
+def format_year_func(y):
+    # 顯示格式： "2024 (民國113年)"
+    # 這樣使用者打 "2024" 或打 "113" 都可以搜到
+    if y > 1911:
+        return f"{y} (民國{y-1911}年)"
+    elif y == 1911:
+        return f"{y} (民國元年)"
+    else:
+        return f"{y} (民前{1912-y}年)"
+
 # --- 主介面 ---
 
-# 1. 模式選擇 (放在最上面，不用包進表單，隨點隨切換)
 mode = st.radio("請選擇模式：", ["國曆 轉 農曆", "農曆 轉 國曆"], horizontal=True)
 
-# 2. 【關鍵！】建立一個表單 (Form)
-# 表單內的輸入不會立刻重整頁面，直到按 Enter 或 Submit
 with st.form(key='date_form'):
     
-    # 使用 columns 讓輸入框並排
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        # format="%d" 非常重要！這樣輸入 2024 才不會變成 2,024 (有逗號)
-        # value=0 預設留給使用者輸入，或者設為今年
-        y = st.number_input("年 (西元/民國)", min_value=1, max_value=2100, value=2024, step=1, format="%d")
+        # 年：使用 selectbox
+        # key point: format_func 讓它顯示民國，使用者可以打字搜尋
+        y = st.selectbox(
+            "年 (可打字搜尋)", 
+            options=year_list, 
+            index=default_year_index, 
+            format_func=format_year_func
+        )
+        
     with c2:
-        m = st.number_input("月", min_value=1, max_value=12, value=1, step=1, format="%d")
+        # 月：1~12
+        m = st.selectbox(
+            "月", 
+            options=range(1, 13), 
+            format_func=lambda x: f"{x}月"
+        )
+        
     with c3:
-        d = st.number_input("日", min_value=1, max_value=31, value=1, step=1, format="%d")
+        # 日：1~31
+        d = st.selectbox(
+            "日", 
+            options=range(1, 32), 
+            format_func=lambda x: f"{x}日"
+        )
 
-    # 閏月勾選 (只有轉國曆時才需要，但為了版面整齊，我們讓它一直存在，用程式碼控制是否生效)
+    # 閏月勾選
     is_leap = False
     if mode == "農曆 轉 國曆":
         is_leap = st.checkbox("輸入的是閏月")
     
-    # 這就是「提交按鈕」，在表單內，按下 Enter 鍵等同於點擊這個按鈕
     submit_btn = st.form_submit_button(label="開始轉換")
 
-# --- 3. 邏輯處理 (當按下按鈕或 Enter 後執行) ---
+# --- 邏輯處理 ---
 if submit_btn:
     try:
-        # 自動判斷民國年 (輸入小於1900自動加1911)
-        calc_year = y
-        if y < 1900:
-            calc_year = y + 1911
-            display_year = f"民國 {y}"
+        # y 這裡取回來的是西元數字 (因為 options 是 year_list 數字列表)
+        # 顯示用的字串 (西元/民國)
+        if y >= 1912:
+            display_year = f"西元 {y} (民國 {y-1911})"
         else:
             display_year = f"西元 {y}"
 
         # 轉換邏輯
         if mode == "國曆 轉 農曆":
-            solar = datetime(calc_year, m, d)
+            solar = datetime(y, m, d)
             lunar = ZhDate.from_datetime(solar)
             trad_lunar = to_traditional_chinese(lunar.chinese())
             
@@ -134,7 +160,7 @@ if submit_btn:
             st.markdown(result_html, unsafe_allow_html=True)
             
         else: # 農曆 轉 國曆
-            lunar = ZhDate(calc_year, m, d, leap_month=is_leap)
+            lunar = ZhDate(y, m, d, leap_month=is_leap)
             solar_dt = lunar.to_datetime()
             minguo_y = solar_dt.year - 1911
             week_days = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
@@ -153,6 +179,6 @@ if submit_btn:
             st.markdown(result_html, unsafe_allow_html=True)
 
     except ValueError:
-        st.error("❌ 日期不存在！(例如：2月30日 或 該年沒有閏月)")
+        st.error(f"❌ 日期無效！請檢查 {y}年{m}月 是否有 {d}日。")
     except Exception as e:
         st.error(f"❌ 發生錯誤：{e}")
