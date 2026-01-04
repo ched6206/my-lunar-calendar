@@ -6,7 +6,7 @@ import calendar
 # --- 網頁設定 ---
 st.set_page_config(page_title="素雅萬年曆", page_icon="📅", layout="wide")
 
-# --- CSS 樣式 (素雅中國風) ---
+# --- CSS 樣式 (全域設定) ---
 st.markdown("""
     <style>
     /* 全域設定 */
@@ -27,7 +27,6 @@ st.markdown("""
         color: #333333;
         border-radius: 4px;
     }
-    /* 隱藏輸入框的加減按鈕 */
     button[kind="secondary"] { border: none; background: transparent; }
 
     /* 左側結果區 */
@@ -42,7 +41,7 @@ st.markdown("""
         box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
     
-    /* --- 右側日曆容器樣式 --- */
+    /* 日曆樣式 */
     .calendar-container {
         background-color: white;
         border: 2px solid #8C5042;
@@ -76,7 +75,6 @@ st.markdown("""
         border: 1px solid #f9f9f9;
     }
     
-    /* 日期格子內容 */
     .day-cell {
         display: flex;
         flex-direction: column;
@@ -91,7 +89,6 @@ st.markdown("""
     .solar-num { font-size: 1.1rem; font-weight: bold; line-height: 1.2; }
     .lunar-num { font-size: 0.7rem; color: #999; line-height: 1; margin-top: 2px; }
 
-    /* 選中日期樣式 (紅底金字) */
     .selected-day-bg {
         background-color: #8C5042;
         border-radius: 4px;
@@ -187,7 +184,7 @@ with col_main:
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        # 輸入框：輸入完按 Enter 即可
+        # Number Input
         y = st.number_input("年", min_value=1, max_value=2100, value=2024, step=1, format="%d")
         if y < 1900:
             st.markdown(f"<div class='hint-text'>民國 {y} 年</div>", unsafe_allow_html=True)
@@ -256,8 +253,9 @@ with col_side:
     st.markdown("<div style='margin-top: 60px;'></div>", unsafe_allow_html=True)
     
     if 'cal_year' in locals():
-        cal_html = generate_calendar_html(cal_year, cal_month, cal_day)
+        # 產生 HTML
+        cal_html_str = generate_calendar_html(cal_year, cal_month, cal_day)
         
-        # 【關鍵修復】
-        # 這裡的 unsafe_allow_html=True 絕對不能少！
-        st.markdown(cal_html, unsafe_allow_html=True)
+        # 【重要！】這行指令負責把 HTML 變成網頁
+        # unsafe_allow_html=True 告訴 Streamlit：「這段字串是 HTML 程式碼，請渲染它，不要印出來」
+        st.markdown(cal_html_str, unsafe_allow_html=True)
